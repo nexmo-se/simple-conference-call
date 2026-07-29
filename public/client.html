@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  
+  <!-- ******* Load Vonage Client SDK from a CDN ****** -->
+  <script src="https://cdn.jsdelivr.net/npm/@vonage/client-sdk@latest/dist/vonageClientSDK.min.js"></script>
+
+</head>
+
+<body>
+
+  <h1 id="title">WebRTC client (using Vonage Client SDK)</h1>
+  
+  <p id="m_notification">>>> Please log in first ...</p>
+  <input type="text" name="username" value="John" placeholder="i.e. Mark" id="username" size="15">
+  <button type="button" id="login">Log in</button>
+  <button type="button" id="logout">Log out</button>
+
+  <hr id="hr1">
+
+  <h2 id="incoming">Receive a call</h1>
+  <p id="i_notification">Log in to receive calls</p>
+  <button type="button" id="i_answer">Answer</button>
+  <button type="button" id="i_reject">Reject</button>
+  <button type="button" id="i_hangup">Hang up</button>
+
+  <hr id="hr2">
+
+  <h2 id="outgoing">Make a call</h1>
+  <p id="o_notification">Log in to make calls</p>
+  <input type="text" name="callee" value="" placeholder="e.g. 1299551212 or Jennifer" id="o_callee" size="30">
+  <button type="button" id="o_call">Call</button>
+  <button type="button" id="o_hangup">Hang Up</button>
+  <div id="iStatus"></div>
+
+  <p id="phone"></p>
+
+  <script>
+    const baseUrl = window.location.protocol + "//" + window.location.host;
+    console.log("baseUrl:", baseUrl);
+
+    const mNotification = document.getElementById("m_notification");
+
+    const userNameInput = document.getElementById("username");
+    const loginBtn = document.getElementById("login");
+    const logoutBtn = document.getElementById("logout");
+    loginBtn.style.display = "inline";
+    logoutBtn.style.display = "none";
+   
+    //-- receive Incoming call --
+    const iNotification = document.getElementById("i_notification");
+
+    const iAnswerBtn = document.getElementById("i_answer");
+    const iRejectBtn = document.getElementById("i_reject");
+    const iHangupBtn = document.getElementById("i_hangup");
+    iAnswerBtn.style.display = "none";
+    iRejectBtn.style.display = "none";
+    iHangupBtn.style.display = "none";
+
+    //-- place Outgoing call --
+    const oNotification = document.getElementById("o_notification");
+
+    const oCalleeInput = document.getElementById("o_callee");
+    const oCallBtn = document.getElementById("o_call");
+    const oHangUpBtn = document.getElementById("o_hangup");
+    oCalleeInput.style.display = "none";
+    oCallBtn.style.display = "none";
+    oHangUpBtn.style.display = "none";
+
+    //---
+    
+    loginBtn.addEventListener("click", async () => {
+      
+      mNotification.textContent = "";
+
+      const username = userNameInput.value.toLowerCase();
+
+      const regex = /^[a-z]/i;  // start with a letter, case insensitive
+      
+      if (regex.test(username)) {      
+        await fetch(baseUrl + "/login", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ user: username })
+        }).then(async (response) => {
+          const body = await response.json();
+          console.log("Got registration response: ", body);
+          if(body.token) {
+            getVonage(body.token, body.dc, username, body.phone);
+          } else {
+            mNotification.textContent = body.message;
+          }
+        })
+
+      } else {
+        mNotification.textContent = ">>> User name must start with a letter";
+        consoloe.log(">>> user name:", username);
+      }
+
+    })
+    
+    //--
+
+    function getVonage(token, dc, username, phone) {
+
+      let callId = null;
+      let sessionId = null;
+
+      const client = new vonageClientSDK.VonageClient({
+        apiUrl: `https://api-${dc}.vonage.com`,
+        websocketUrl: `wss://ws-${dc}.vonage.com`
+      });
+
+      client.createSession(token)
+        .then(_sessionId => {
+          sessionId = _sessionId;
+          console.log(">>> Vonage WebRTC client app up and running! Session Id: ", _sessionId);
+          userNameInput.style.display = "none";
+          loginBtn.style.display = "none";
+          logoutBtn.textContent = "Log out " + username;
+          logoutBtn.style.display = "inline";
+          iNotification.textContent = "Call in by dialing phone number: " + phone;
+          iAnswerBtn.style.display = "none";
+          iRejectBtn.style.display = "none";
+          iHangupBtn.style.display = "none";
+          iHangupBtn.style.display = "none";
+          oNotification.textContent = "";
+          oCalleeInput.style.display = "inline";
+          oCallBtn.style.display = "inline";
+        })
+        .catch(error  => { 
+          console.error(">>> Error creating session: ", error);
+        });
+      
+      // Incoming call
+      client.on('callInvite', (_callId, from, channel) => {
+        callId = _callId;
+        console.log('>>> Incoming call uuid:', callId);
+        iNotification.textContent = ">>> You are receiving a call from:" + from;
+
+        loginBtn.style.display = "none";
+        logoutBtn.style.display = "none";
+        iAnswerBtn.style.display = "inline";
+        iRejectBtn.style.display = "inline";
+        iHangupBtn.style.display = "none";
+      });  
+
+      // To answer an incoming call
+      iAnswerBtn.addEventListener("click", () => {
+
+        console.log('>>> iAnswerBtn callId:', callId);
+
+        client.answer(callId)
+        .then(() => {
+          loginBtn.style.display = "none";
+          logoutBtn.style.display = "none";
+          iAnswerBtn.style.display = "none";
+          iRejectBtn.style.display = "none";
+          iHangupBtn.style.display = "inline";
+          console.log(">>> Call answered by user");
+          mNotification.textContent = ">>> You are on a call";
+        })
+        .catch(error => {
+          mNotification.textContent = ">>> Ready to receive or place a call";
+          loginBtn.style.display = "none";
+          logoutBtn.style.display = "inline";
+          iAnswerBtn.style.display = "none";
+          irejectBtn.style.display = "none";
+          iHangupBtn.style.display = "none";
+          console.error(">>> Error answering call (possibly rejected by user):", error);
+        }); 
+      });
+
+      // To reject an incoming call
+      iRejectBtn.addEventListener("click", () => {
+
+        console.log('>>> iRejectBtn callId:', callId);
+
+        client.reject(callId)
+          .then(() => {
+            loginBtn.style.display = "none";
+            logoutBtn.style.display = "inline";
+            iAnswerBtn.style.display = "none";
+            iRejectBtn.style.display = "none";
+            iHangupBtn.style.display = "none";
+            console.log(">>> Call rejected by user");
+            iNotification.textContent = "Call in by dialing phone number: " + phone;
+          })
+          .catch(error => {
+            console.error(">>> Error rejecting call", callId, error);
+          });          
+      });
+
+      // To terminate a live (incoming) call
+      iHangupBtn.addEventListener("click", () => {
+        client.hangup(callId)
+          .then(() => {
+            loginBtn.style.display = "none";
+            logoutBtn.style.display = "inline";
+            iNotification.textContent = "Call in by dialing phone number: " + phone;
+            iAnswerBtn.style.display = "none";
+            iRejectBtn.style.display = "none";
+            iHangupBtn.style.display = "none";
+            console.log(">>> Call terminated by user");
+            iNotification.textContent = "Call in by dialing phone number: " + phone;
+          })
+          .catch(error => {
+            console.error(">>> Error hanging up call: ", error);
+          });                
+      });
+
+      //-- To place an outgoing call --
+      oCallBtn.addEventListener("click", event => {
+
+        console.log(">>> Clicked on [Call] button");
+
+        const destination = oCalleeInput.value.toLowerCase();
+        
+        if (destination !== "") {
+          client.serverCall({ 
+              to: destination,
+              custom_data: {param1: "foo", param2: 123}
+            })
+            .then((_callId) => {
+              callId = _callId;
+              console.log('Call ID:', callId);
+              mNotification.textContent = "";
+              oNotification.textContent = "Calling " + oCalleeInput.value;
+              loginBtn.style.display = "none";
+              logoutBtn.style.display = "none";
+              oCalleeInput.style.display = "none";
+              oCallBtn.style.display = "none";
+              oHangUpBtn.style.display = "inline";
+            })
+            .catch((error)=>{
+              console.error(`Error making call: ${error}`);
+            });
+        } else {
+          statusElement.innerText = 'Please enter phone number or user name';
+        }
+      });
+
+      //-- To terminate a live outgoing call --
+      oHangUpBtn.addEventListener("click", () => {
+        client.hangup(callId)
+          .then(() => {
+            userNameInput.style.display = "none";
+            loginBtn.style.display = "none";
+            logoutBtn.style.display = "inline";
+            mNotification.textContent = ">>> You ended the call - Ready to receive or place a new incoming call";
+            oNotification.textContent = "";
+            oCalleeInput.style.display = "inline";
+            oCallBtn.style.display = "inline";
+            oHangUpBtn.style.display = "none";
+            console.log(">>> Call terminated by user");
+          })
+          .catch(error => {
+            console.error(">>> Error hanging up call: ", error);
+          });                
+      });
+
+      //-- To log out --
+      logoutBtn.addEventListener("click", async () => {
+        
+        const username = userNameInput.value.toLowerCase();
+        
+        await fetch(baseUrl + "/logout", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ user: username, session: sessionId })
+        }).then(async (response) => {
+          mNotification.textContent = ">>> Please log in first ...";
+          userNameInput.style.display = "inline";
+          loginBtn.style.display = "inline";
+          logoutBtn.style.display = "none";
+          iNotification.textContent = "Log in to receive calls";
+          oNotification.textContent = "Log in to make calls";
+          iAnswerBtn.style.display = "none";
+          iRejectBtn.style.display = "none";
+          iHangupBtn.style.display = "none";
+          oCalleeInput.style.display = "none";
+          oCallBtn.style.display = "none";
+          oHangUpBtn.style.display = "none";
+          console.log("Terminated session (logout): ", sessionId);
+        });
+
+
+
+      })
+
+
+      // Call status change
+      client.on('legStatusUpdate', (_callId, legId, status) => {
+
+        console.log('>>> Leg status update:', status)
+
+        if (status == 'COMPLETED') {
+
+          mNotification.textContent = ">>> Call has ended - Ready to receive or place a new incoming call";
+          loginBtn.style.display = "none";
+          logoutBtn.style.display = "inline";
+          iNotification.textContent = "Call in by dialing phone number: " + phone;
+          iAnswerBtn.style.display = "none";
+          iRejectBtn.style.display = "none";
+          iHangupBtn.style.display = "none";
+          oNotification.textContent = "";
+          oCalleeInput.style.display = "inline";
+          oCallBtn.style.display = "inline";
+          oHangUpBtn.style.display = "none";
+          mNotification.textContent = ">>> Call has ended - Ready to receive or place a new incoming call";
+          callId = null;
+          console.log(">>> Call terminated by remote party");
+        
+        }
+
+      });
+
+      // Call has been anwered elsewhere
+      client.on('callInviteCancel', (_callId) => {
+        iNotification.textContent = ">>> Call answered elsewhere - Ready to place or receive a new incoming call ...";
+        loginBtn.style.display = "none";
+        logoutBtn.style.display = "inline";
+        iAnswerBtn.style.display = "none";
+        iRejectBtn.style.display = "none";
+        iHangupBtn.style.display = "none";
+        console.log(">>> Call answered elsewhere");
+        callId = null;
+      });
+
+      // Call has terminated
+      client.on("callHangup", (_callId, callQuality, reason) => {
+        mNotification.textContent = ">>> Call has ended - Ready to place or receive a new incoming call";
+        loginBtn.style.display = "none";
+        logoutBtn.style.display = "inline";
+        iNotification.textContent = "Call in by dialing phone number: " + phone;
+        iAnswerBtn.style.display = "none";
+        iRejectBtn.style.display = "none";
+        iHangupBtn.style.display = "none";
+        oNotification.textContent = "";
+        oCalleeInput.style.display = "inline";
+        oCallBtn.style.display = "inline";
+        oHangUpBtn.style.display = "none";
+        console.log(`>>> Call ${_callId} has terminated, callQuality:${callQuality}, reason:${reason.name}`);
+        callId = null;
+      });
+
+    }
+      
+  </script>
+</body>
+
+</html>
