@@ -35,6 +35,8 @@ ElevenLabs Agent</br>
 https://github.com/nexmo-se/elevenlabs-agent-ws-connector,</br></br>
 Deepgram ASR</br>
 https://github.com/nexmo-se/deepgram-connector,</br></br>
+AssemblyAI ASR</br>
+https://github.com/nexmo-se/assemblyai-connectors,</br></br>
 OpenAI STS Realtime API</br>
 https://github.com/nexmo-se/openai-realtime-connector,</br></br>
 Hume STS EVI + Immersitech Noise Cancellation / Voice Isolation</br>
