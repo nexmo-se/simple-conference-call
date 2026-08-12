@@ -25,11 +25,6 @@ app.use(function (req, res, next) {
 
 app.use(bodyParser.json());
 
-//--- Optional - For VCR (Vonage Cloud Runtime, aka Neru) installation ----
-
-const neruHost = process.env.NERU_HOST;
-// console.log('neruHost:', neruHost);
-
 //------------------------------
 
 const appId = process.env.APP_ID;
@@ -52,15 +47,6 @@ const credentials = new Auth({
   privateKey: './.private.key'
 });
 
-// const options = {
-//   apiHost: `https://${apiRegion}`
-// };
-
-//- test
-// const options = {
-//   apiHost: 'https://api-us.vonage.com'
-// };
-
 const { Vonage } = require('@vonage/server-sdk');
 
 // const vonage = new Vonage(credentials, options);
@@ -81,17 +67,6 @@ for (let client in clientList){
 };
 
 console.log('List of allowable clients:', clients);
-
-// create IVR voice prompts for PSTN incoming calls, the following example assumes
-// you did specify more than 1 and up to 9 allowable client SDK user names (in .env file)
-
-// let ivrPrompt = "Welcome to our company. ";
-
-// let index = 0;
-// for (let client of clients) {
-//   index++;
-//   ivrPrompt = ivrPrompt + `To speak to ${client}, press ${index}. `;
-// };
 
 const clientsArray = Array.from(clients);
 
@@ -142,7 +117,7 @@ app.get('/answer', (req, res) => {
             "text": "Enter a 6-digit conference bridge number",
             "bargeIn": true,
             "language": "en-US",
-            "style": 0
+            "style": 11
           },
           {
             "action": "input",
@@ -163,7 +138,7 @@ app.get('/answer', (req, res) => {
             "action": "talk",
             "text": "Connecting your call, please wait",
             "language": "en-US",
-            "style": 0
+            "style": 11
           },        
           {
             "action": "connect",
@@ -188,7 +163,7 @@ app.get('/answer', (req, res) => {
           "action": "talk",
           "text": "Connecting your call, please wait",
           "language": "en-US",
-          "style": 0
+          "style": 11
         },
         { 
           "action": "connect", 
@@ -214,7 +189,7 @@ app.get('/answer', (req, res) => {
         "text": "Enter a 6-digit conference bridge number",
         "bargeIn": true,
         "language": "en-US",
-        "style": 0
+        "style": 11
       },
       {
         "action": "input",
@@ -280,7 +255,7 @@ app.post('/event', (req, res) => {
       })
         .then(res => {
 
-          callTracking[uuid]["wsUuid"] = res.uuid;  // store peer WebSocet leg uuid for original call info set
+          callTracking[uuid]["wsUuid"] = res.uuid;  // store peer WebSocket leg uuid for original call info set
           
           addInfoToCallTracking(res.uuid);  // WebSocket uuid
           callTracking[res.uuid]["convUuid"] = res.conversation_uuid; // Initial Conv uuid of this WebSocket leg
@@ -346,63 +321,50 @@ app.post('/dtmf', (req, res) => {
 
   let nccoResponse;
 
-  // if (req.body.dtmf.timed_out == true) {
+  const confNumber = req.body.dtmf.digits;
 
-  //   nccoResponse = [
-  //     {
-  //       "action": "talk",
-  //       "text": "You did not press any key, good bye",
-  //       "language": "en-US",
-  //       "style": 0
-  //     }
-  //   ];
+  if (confNumber.length == 6) {
 
-  // } else {
+    callTracking[uuid]["confNumber"] = confNumber;
 
-    const confNumber = req.body.dtmf.digits;
+    const spokenDigits = confNumber.split('').join(' ');
 
-    if (confNumber.length == 6) {
+    nccoResponse = [
+      {
+        "action": "talk",
+        "text": `We are connecting your call to the conference bridge number ${spokenDigits}, please wait`,
+        "language": "en-US",
+        "style": 11
+      },
+      {
+        "action": "conversation",
+        "name": `conf_${confNumber}`,
+        "startOnEnter": true
+      }
+    ];
 
-      callTracking[uuid]["confNumber"] = confNumber;
+  } else {
 
-      const spokenDigits = confNumber.split('').join(' ');
-
-      nccoResponse = [
-        {
-          "action": "talk",
-          "text": `Your call is now connected to the conference bridge number ${spokenDigits}`,
-          "language": "en-US",
-          "style": 0
+    nccoResponse = [
+      {
+        "action": "talk",
+        "text": "Enter a 6-digit number",
+        "bargeIn": true,
+        "language": "en-US",
+        "style": 11
+      },
+      {
+        "action": "input",
+        "eventUrl": [`https://${hostName}/dtmf2`],
+        "type": ["dtmf"],
+        "dtmf": {
+          "maxDigits": 6
         },
-        {
-          "action": "conversation",
-          "name": `conf_${confNumber}`,
-          "startOnEnter": true
-        }
-      ];
+        timeout: 7
+      }
+    ];
 
-    } else {
-
-      nccoResponse = [
-        {
-          "action": "talk",
-          "text": "Enter a 6-digit number",
-          "bargeIn": true,
-          "language": "en-US",
-          "style": 0
-        },
-        {
-          "action": "input",
-          "eventUrl": [`https://${hostName}/dtmf2`],
-          "type": ["dtmf"],
-          "dtmf": {
-            "maxDigits": 6
-          },
-          timeout: 7
-        }
-      ];
-
-    }
+  }
 
   // }
 
@@ -420,55 +382,40 @@ app.post('/dtmf2', (req, res) => {
 
   let nccoResponse;
 
-  // if (req.body.dtmf.timed_out == true) {
+  const confNumber = req.body.dtmf.digits;
 
-  //   nccoResponse = [
-  //     {
-  //       "action": "talk",
-  //       "text": "You did not press any key, good bye",
-  //       "language": "en-US",
-  //       "style": 0
-  //     }
-  //   ];
+  if (confNumber.length == 6) {
 
-  // } else {
+    callTracking[uuid]["confNumber"] = confNumber;
 
-    const confNumber = req.body.dtmf.digits;
+    const spokenDigits = confNumber.split('').join(' ');
 
-    if (confNumber.length == 6) {
+    nccoResponse = [
+      {
+        "action": "talk",
+        "text": `We are connecting your call to the conference bridge number ${spokenDigits}, please wait`,
+        "language": "en-US",
+        "style": 11
+      },
+      {
+        "action": "conversation",
+        "name": `conf_${confNumber}`,
+        "startOnEnter": true
+      }
+    ];
 
-      callTracking[uuid]["confNumber"] = confNumber;
+  } else {
 
-      const spokenDigits = confNumber.split('').join(' ');
+    nccoResponse = [
+      {
+        "action": "talk",
+        "text": "You did not enter 6 digits, good bye",
+        "language": "en-US",
+        "style": 11
+      }
+    ];
 
-      nccoResponse = [
-        {
-          "action": "talk",
-          "text": `Your call is now connected to the conference bridge number ${spokenDigits}`,
-          "language": "en-US",
-          "style": 0
-        },
-        {
-          "action": "conversation",
-          "name": `conf_${confNumber}`,
-          "startOnEnter": true
-        }
-      ];
-
-    } else {
-
-      nccoResponse = [
-        {
-          "action": "talk",
-          "text": "You did not enter 6 digits, good bye",
-          "language": "en-US",
-          "style": 0
-        }
-      ];
-
-    }
-
-  // }
+  }
 
   res.status(200).json(nccoResponse);
   
@@ -478,20 +425,16 @@ app.post('/dtmf2', (req, res) => {
 
 app.get('/ws_answer', (req, res) => {
 
-  // setTimeout( () => { // testing delaying response
+  const nccoResponse = [
+    {
+      "action": "conversation",
+      "name": `conf_${req.query.conference_number}`,
+      "startOnEnter": true,
+      "canHear": [req.query.peer_uuid] // this WebSocket listens only to the peer call leg
+    }
+  ];
 
-    const nccoResponse = [
-      {
-        "action": "conversation",
-        "name": `conf_${req.query.conference_number}`,
-        "startOnEnter": true,
-        "canHear": [req.query.peer_uuid] // this WebSocket listens only to the peer call leg
-      }
-    ];
-
-    res.status(200).json(nccoResponse);
-
-  // }, 300)  
+  res.status(200).json(nccoResponse);
   
 });
 
@@ -499,39 +442,22 @@ app.get('/ws_answer', (req, res) => {
 
 app.post('/ws_event', (req, res) => {
 
-  const uuid = req.body.uuid;
+  res.status(200).send('Ok');
+
+  const peerUuid = req.query.peer_uuid;
 
   //--
 
-  if (req.body.type == "transfer") {
+  if (req.body.type == "transfer") {  // the WebSocket leg is now effectively attached to the conference
 
-    if (req.body.conversation_uuid_from == callTracking[uuid]["convUuid"]) {  // is it the first transfer event for this WebSocket leg?
-
-      // debug
-      console.log(">>> This is the 1st transfer to named conference");
-      console.log(">>> conference name:", "conf_" + req.query.conference_number);
-      console.log(">>> canhear:", req.query.peer_uuid);
-
-      const ncco =
-        [
-          {
-            "action": "conversation",
-            "name": "conf_" + req.query.conference_number, // put back in same named conference
-            "canHear": [req.query.peer_uuid],
-            "startOnEnter": true
-          }
-        ];
-         
-      vonage.voice.transferCallWithNCCO(uuid, ncco)
-      .then(res => console.log(`>>> WebSocket ${uuid} audio controls updated`))
-      .catch(err => console.error(`>>> Updating WebSocket ${uuid} audio controls error:`, err))
-
-    } else {
-
-      // debug
-      console.log(">>> This is the subsequent transfer to named conference");
-
-    }
+    vonage.voice.playTTS(peerUuid,  
+    {
+      text: 'You may now speak.',
+      language: 'en-US', 
+      style: 11
+    })
+    .then(resp => console.log('>>> Play TTS on participant leg', peerUuid))
+    .catch(err => console.error('>>> Play TTS error on participant leg', peerUuid, err));
 
   }  
 
@@ -540,12 +466,10 @@ app.post('/ws_event', (req, res) => {
   if (req.body.status == "completed") {
 
     setTimeout ( () => {
-      deleteFromCallTracking(uuid); // info set no longer needed
+      deleteFromCallTracking(req.body.uuid); // info set no longer needed
     }, 5000)
 
   }  
-
-  res.status(200).send('Ok');
   
 });
 
@@ -558,14 +482,6 @@ app.post('/results', (req, res) => {
   res.status(200).send('Ok');
   
 });
-
-//--------
-
-// app.post('/rtc', (req, res) => {
-
-//   res.status(200).send('Ok');
-  
-// });
 
 //=== Services for the WebRTC client (Vonage client SDK) ===============
 
@@ -738,7 +654,7 @@ async function delSession(session) {
 
 }
 
-//--------------- for VCR ----------------
+//--- For the case where this application is deployed on Vonage Cloud Runtime (VCR) ---
 
 app.get('/_/health', async (req, res) => {
    
@@ -752,7 +668,7 @@ app.use ('/', express.static(__dirname + '/public')); // static web server
 
 //=========================================
 
-const port = process.env.NERU_APP_PORT || process.env.PORT || 8000;
+const port = process.env.VCR_PORT || process.env.PORT || 8000;
 
 app.listen(port, () => console.log(`Application listening on port ${port}`));
 
