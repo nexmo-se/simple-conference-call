@@ -15,9 +15,9 @@ Viber voice calls.</br>
 
 This application connects voice calls to a Connector server by using the [WebSockets feature](https://developer.vonage.com/en/voice/voice-api/concepts/websockets) of Vonage Voice API.</br>
 
-When a voice call is established, this Voice API application triggers a WebSocket connection from Vonage platform to the Connector server which streams audio in one or both directions between the voice call and the AI engines. 
+When a voice call is established, this Voice API application triggers a WebSocket connection from the Vonage Voice platform to the Connector server which streams audio in one or both directions between the voice call and the AI engine(s). 
 
-Instead of using this sample Voice API application, you may use your own existing Voice API application to establish WebSockets with the Connector server to connect your managed voice calls with the AI engines.
+Instead of using this sample Voice API application, you may use your own existing Voice API application to establish WebSockets with the Connector server to connect your managed voice calls with the AI engine(s).
 
 Your new or existing Voice API application may be written with any programming language using [server SDKs](https://developer.vonage.com/en/tools) or with direct [REST API](https://developer.vonage.com/en/api/voice) calls.
 
@@ -46,7 +46,7 @@ https://github.com/nexmo-se/humeai-connector,</br></br>
 
 https://github.com/nexmo-se/websocket-server-variant-3.</br> 
 
-Default local (not public!) of any one of the Connector servers `port` is: 6000.
+Default local (not public!) `port`, of any one of these Connector servers, is: 6000.
 
 If you plan to test using a `Local deployment`, you may use ngrok (an Internet tunneling service) for both<br>
 this Voice API application<br>
@@ -109,7 +109,12 @@ For the next steps, you will need:</br>
 ### Local deployment
 
 Copy or rename .env-example to .env<br>
-Update parameters in .env file<br>
+ ```bash
+cp .env-example .env
+```
+
+**Update** the parameters arguments in the .env file<br>
+
 Have Node.js installed on your system, this application has been tested with Node.js version 22.16<br>
 
 Install node modules with the command:<br>
@@ -126,7 +131,7 @@ or
 node test-conf-call
 ```
 
-The second server application does not need the participant to enter a conference number as it uses a default conference number just for tests. 
+The second server application does not need the participant to enter a conference number as it uses a default conference number _just for tests_. 
 
 Default local (not public!) `port` of either server application is: 8000.
 
@@ -138,7 +143,7 @@ Call the **`phone number linked`** to your application, enter a conference numbe
 
 #### Outbound calling
 
-Will be added to the code later
+Will be added to the sample code later.
 
 
 
