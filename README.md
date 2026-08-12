@@ -128,10 +128,10 @@ node simple-conference-call
 ```
 or
 ```bash
-node test-conf-call
+node test-one-conf-call
 ```
 
-The second server application does not need the participant to enter a conference number as it uses a default conference number _just for tests_. 
+The second server application does not need the participant to enter a conference number as it uses a default conference number, this second application handles only ONE conference _just for tests_.
 
 Default local (not public!) `port` of either server application is: 8000.
 

@@ -8,8 +8,9 @@ const express = require('express');
 const bodyParser = require('body-parser')
 const app = express();
 const fs = require('fs');
-
+const crypto = require('crypto');
 const axios = require('axios');
+const moment = require('moment');
 
 //-- CORS - update as needed for your environment -
 app.use(function (req, res, next) {
@@ -49,7 +50,6 @@ const credentials = new Auth({
 
 const { Vonage } = require('@vonage/server-sdk');
 
-// const vonage = new Vonage(credentials, options);
 const vonage = new Vonage(credentials);
 
 const privateKey = fs.readFileSync('./.private.key');
@@ -93,6 +93,26 @@ function addInfoToCallTracking(uuid) {
 
 function deleteFromCallTracking(uuid) {
   delete callTracking[uuid];
+}
+
+//---- Conference name info tracking ----
+
+let confName = {}; // dictionary
+
+function addInfoToConfName(number) {
+  const name = "conf_" + crypto.randomUUID();
+  confName[number] = {};
+  confName[number]["confName"] = name; // map number to a conference name
+  confName[number]["startTime"] = moment(Date.now()).format('YYYY-MM-DD HH:mm:ss:SSS'); // server local time
+  // confName[number]["startTime"] = moment.utc(Date.now()).format('YYYY-MM-DD HH:mm:ss:SSS'); // UTC time
+  // console.log(`>>> Conference number ${number} mapped to conference name ${name}`);
+
+  setTimeout( () => {
+    delete confName[number];
+    // console.log(`>>> confName[${number}] dictionary entry deleted`);
+  }, 30000);
+
+  return name;
 }
 
 //==========================================================
@@ -327,6 +347,13 @@ app.post('/dtmf', (req, res) => {
 
     callTracking[uuid]["confNumber"] = confNumber;
 
+    //--
+
+    const conferenceName = confName?.[confNumber]?.["confName"] ?? addInfoToConfName(confNumber);
+    // console.log('>>> ConferenceName:', conferenceName);
+
+    //--
+
     const spokenDigits = confNumber.split('').join(' ');
 
     nccoResponse = [
@@ -338,7 +365,7 @@ app.post('/dtmf', (req, res) => {
       },
       {
         "action": "conversation",
-        "name": `conf_${confNumber}`,
+        "name": conferenceName,
         "startOnEnter": true
       }
     ];
@@ -388,6 +415,13 @@ app.post('/dtmf2', (req, res) => {
 
     callTracking[uuid]["confNumber"] = confNumber;
 
+    //--
+
+    const conferenceName = confName?.[confNumber]?.["confName"] ?? addInfoToConfName(confNumber);
+    console.log('>>> zone 10 - conferenceName:', conferenceName);
+
+    //--
+
     const spokenDigits = confNumber.split('').join(' ');
 
     nccoResponse = [
@@ -399,7 +433,7 @@ app.post('/dtmf2', (req, res) => {
       },
       {
         "action": "conversation",
-        "name": `conf_${confNumber}`,
+        "name": conferenceName,
         "startOnEnter": true
       }
     ];
@@ -428,7 +462,7 @@ app.get('/ws_answer', (req, res) => {
   const nccoResponse = [
     {
       "action": "conversation",
-      "name": `conf_${req.query.conference_number}`,
+      "name": confName[req.query.conference_number]["confName"],
       "startOnEnter": true,
       "canHear": [req.query.peer_uuid] // this WebSocket listens only to the peer call leg
     }
@@ -444,11 +478,11 @@ app.post('/ws_event', (req, res) => {
 
   res.status(200).send('Ok');
 
-  const peerUuid = req.query.peer_uuid;
-
   //--
 
   if (req.body.type == "transfer") {  // the WebSocket leg is now effectively attached to the conference
+
+    const peerUuid = req.query.peer_uuid;
 
     vonage.voice.playTTS(peerUuid,  
     {
